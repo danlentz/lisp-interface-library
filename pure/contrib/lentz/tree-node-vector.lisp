@@ -23,7 +23,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The abstraction of a 5-tuple defines the low-level interface to the storage
 ;; allocation strategies that are shared by the various mechanisms defining
-;; Node Instance Access.  (An abstract-super-metaclass?)  
+;; Node Instance Access. 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
