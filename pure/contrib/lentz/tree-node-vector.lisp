@@ -8,76 +8,24 @@
 
 (in-package :tree)
 
-(deflayer allocation)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (defvar %slots% (loop for i from 0 for k in '(:k :v :l :r :x) collect (cons k i)))
+(defvar %leaf%     nil)
+(defvar %unbound% '%unbound%)
 
-(deflayer memory (allocation))
+(defun leaf ()
+  %leaf%)
 
+(defun unbound ()
+  %unbound%)
 
-(defclass root-object ()
-  ()
-  (:metaclass funcallable-standard-class))
-
-
-
-
-    (if (null args) tuple
-      (wrap-tuple args this))))
-
-
-      (let* ((parent this)
-              (tuple args))
-        this))))
-
-;;  (let* (tuple properties parent k v l r x) 
-
-(deflex t0 (wrap-tuple (allocate-tuple :k 0 :v 0 :l nil :r nil :x nil)))
-(deflex t1 (wrap-tuple (allocate-tuple :k 1 :v 1 :l nil :r nil :x nil)))
-(deflex t2 (wrap-tuple (allocate-tuple :k 2 :v 2 :l nil :r nil :x nil)))
-(deflex x (wrap-tuple (allocate-tuple)))
-
-(assert (equalp
-          (funcall x)
-          (funcall (funcall (funcall x (funcall t0)) :top))))
-
-(assert (equalp
-          (funcall x)
-          (funcall (funcall (funcall x (funcall t0)) :up))))
-
-(assert (equalp
-          (funcall x)
-          (funcall (funcall (funcall (funcall (funcall x (funcall t0)) (funcall t1)) :up) :up))))
-
-
-
-
-#(%UNBOUND% %UNBOUND% %UNBOUND% %UNBOUND% %UNBOUND%)
-
-(%UNBOUND% %UNBOUND% %UNBOUND% %UNBOUND% %UNBOUND%)
-((%UNBOUND%) (%UNBOUND%) (%UNBOUND%) (%UNBOUND%) (%UNBOUND%))
-
-
-
-(defun tuple (&rest elements)
-  (let* (k v l r x 
-          (object (make-instance 'tuple))
-          (slots %slots%)
-          (init (or elements (make-list (length %slots%) :initial-element %unbound%)))
-          (vector (make-array (length init) :initial-contents init)))
-    (set-funcallable-instance-function object
-      (pandora:plambda (args) (k v l r x object slots vector)
-        (let ((selection (or (assoc args slots) (rassoc args slots))))
-          (case (car selection)
-            
-            ((:k :v :x) (svref vector (cdr selection)))
-            ((:l :r)  (apply 'tuple (coerce vector 'list))) 
-            (t (if (null args) pandora::this (coerce vector 'list)))))))
-    object))
-          
-    
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The abstraction of a 5-tuple defines the low-level interface to the storage
+;; allocation strategies that are shared by the various mechanisms defining
+;; Node Instance Access.  (An abstract-super-metaclass?)  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (defstruct (node
              (:type vector) :named
@@ -108,28 +56,6 @@
     (values thing t)
     (call-next-method)))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; "THE NODE 'CLASS'"
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
-;; (describe 'node) =>
-;;
-;; TREE:NODE [symbol]
-;;
-;; NODE names a compiled function:
-;;   Lambda-list: (K V L R &REST ARGS &AUX (X? (WHEN ARGS (LIST* X ARGS))))
-;;   Derived type: (FUNCTION (T T T T &REST T)
-;;                  (VALUES (SIMPLE-VECTOR 6) &OPTIONAL))
-;;   Source file: /Volumes/u/dan/src/development/gs/ebu/dstm-collections/tree.lisp
-;;
-;; NODE names a type-specifier:
-;;   Lambda-list: ()
-;;   Expansion: (AND (SIMPLE-VECTOR 6) (SATISFIES LOOKS-NODISH-TO-ME))
-;;
-;; (allocate-standard-node)           => #(NODE %UNBOUND% %UNBOUND% NIL NIL 1)
-;; (type-of (allocate-standard-node)) => (SIMPLE-VECTOR 6)
-;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public Node Access Interface
@@ -227,32 +153,3 @@
               (,x  (node/x ,gtree)))
          ,@body))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#|
-(defun pipeop (q)
-  (labels ((pipeop-n (expr rest)
-             (let ((expr (read-from-string expr)))
-               `(,@(if (numberp expr)
-                     `(nth ,(1- expr))
-                     (list expr))
-                  ,@(if rest (list rest) rest))))
-            (recur (q acc)
-              (let* ((cmds (string q))
-                      (pos (position #\/ cmds)))
-                (if pos
-                 (recur (subseq cmds (1+ pos))
-                    (pipeop-n (subseq cmds 0 pos) acc))
-                  (pipeop-n cmds acc)))))
-    (recur q () )))
-
-#+()
-(set-dispatch-macro-character #\# #\/  (lambda (str char arg)
-                                         (declare (ignore char arg))
-                                           (pipeop (read str nil nil nil))))
-
-;; (progn #/person/car/father/name/last/1)
-;; => (PROGN (NTH 0 (LAST (NAME (FATHER (CAR (PERSON)))))))
-|#
