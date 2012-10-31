@@ -132,6 +132,9 @@
 ;; (make <urn> :identity "test")
 ;; => da5b8893-d6ca-5c1c-9a9c-91f40a2a3649
 ;;
+;; (render-uri (make <urn> :identity "test"))
+;; => "urn:uuid:da5b8893-d6ca-5c1c-9a9c-91f40a2a3649"
+;;
 ;; (== <urn> (make <urn> :identity "test") (make <urn> :identity "test"))
 ;; => T
 ;;
