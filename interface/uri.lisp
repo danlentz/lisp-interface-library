@@ -13,11 +13,8 @@
     (ql:quickload pkgs)))
 
 ;;;
-;;; supporting utilities.  Again in production there'd be a bit more care given to the
-;;; nuances of uri/urn semantics. I have a decent collection of code implementing such 
-;;; things scattered among a couple of other projects that i've used with de.setf.resource
-;;; and wilbur.
-;;;
+;;; In production there'd be a bit more care given to the nuances of uri/urn semantics. 
+;;; 
 
 (defgeneric render-uri (uri)
   (:method ((uri t))        (princ-to-string uri))
@@ -26,59 +23,46 @@
   (:method ((uri unicly:unique-universal-identifier)) (unicly:uuid-as-urn-string nil uri)))
 
 
-(defgeneric compare-uri (x y)
-  (:method ((x t) (y t))
+(define-interface <uri-namestring> (<order>)
+  ()
+  (:method> order< (x y)
+    (string-lessp (render-uri x) (render-uri y)))
+  (:method> order<= (x y)
+    (string-not-greaterp (render-uri x) (render-uri y)))
+  (:method> order> (x y)
+    (string-greaterp (render-uri x) (render-uri y)))
+  (:method> order>= (x y)
+    (string-not-lessp (render-uri x) (render-uri y)))
+  (:method> == (x y)
+    (string-equal (render-uri x) (render-uri y)))
+  (:method> == ((x puri:uri) (y puri:uri))
+    (puri:uri= x y))
+  (:method> == ((x unicly:unique-universal-identifier) (y unicly:unique-universal-identifier))
+    (unicly:uuid-eql x y))
+  (:method> == ((x puri:uri) (y unicly:unique-universal-identifier))
+    (== y x))
+  (:method> == ((x unicly:unique-universal-identifier) (y puri:uri))
+    (== x (unicly:make-v5-uuid unicly:*uuid-namespace-url* (render-uri y))))
+  (:method> == ((x puri:urn) (y unicly:unique-universal-identifier))
+    (== (render-uri x) (render-uri y)))
+  (:method> == ((x unicly:unique-universal-identifier) (y puri:urn))
+    (== y x))
+  (:method> compare (x y)
     (cond
-      ((eq           x y)  0)
-      ((string-lessp (render-uri x) (render-uri y)) -1)
-      (t                   1)))
-  (:method ((x string) (y string))
-    (cond
-      ((equalp       x y)  0)
-      ((string-lessp x y) -1)
-      (t                   1)))
-  (:method (x (y puri:uri))
-    (- (compare-uri y x)))
-  (:method ((x puri:uri) y)
-    (compare-uri (render-uri x) (render-uri y)))
-  (:method (x (y unicly:unique-universal-identifier))
-    (- (compare-uri y x)))
-  (:method ((x unicly:unique-universal-identifier) y)
-    (compare-uri (render-uri x) (render-uri y)))
-  (:method ((x unicly:unique-universal-identifier) (y puri:urn))
-    (- (compare-uri y x)))
-  (:method ((x puri:urn) (y unicly:unique-universal-identifier))
-    (compare-uri (render-uri x) (render-uri y)))
-  (:method ((x unicly:unique-universal-identifier) (y puri:uri))
-    (compare-uri x (unicly:make-v5-uuid unicly:*uuid-namespace-url* (render-uri y))))
-  (:method ((x puri:uri) (y unicly:unique-universal-identifier))
-    (- (compare-uri y x)))
-  (:method ((x unicly:unique-universal-identifier) (y unicly:unique-universal-identifier))
-    (or (when (unicly:uuid-eql x y) 0)
-      (compare-uri (render-uri x) (render-uri y))))
-  (:method ((x puri:uri) (y puri:uri))
-    (or (when (puri:uri= x y) 0)
-      (compare-uri (render-uri x) (render-uri y)))))
-
-(defun uri-eq (x y)
-  (= 0 (compare-uri x y)))
+      ((==     x y)  0)
+      ((order< x y) -1)
+      (t             1)))
+  (:abstract))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Take 1: Simplistic (but working) First Attempt
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(define-interface <uri> (<compare> )
-  ((compare-function :initarg :compare :reader compare-function))
-  (:parametric (&optional (compare #'compare-uri)) (make-interface :compare compare))
+(define-interface <uri> (<uri-namestring>)
+  ()
   (:method> uri-p (thing)
     (or (puri:uri-p thing) (unicly:unique-universal-identifier-p thing)))
   (:singleton))
 
 
 (define-interface <url> (<uri> <makeable>) ()
-  (:parametric (&optional (compare #'compare-uri)) (make-interface :compare compare))
   (:singleton))
 
 
@@ -89,7 +73,6 @@
 
 
 (define-interface <urn> (<uri> <makeable>) ()
-  (:parametric (&optional (compare #'compare-uri)) (make-interface :compare compare))
   (:singleton))
 
 
@@ -100,10 +83,12 @@
     (0 (unicly:make-null-uuid))))
 
 
-;;;
-;;; testing it out...  The following does indeed show the intended operation and output 
-;;; that I'm looking to achieve from the <URI> Interface
-;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; testing it out...  The following does indeed show the intended operation and
+;;; output that I'm looking to achieve from the <URI> Interface
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;; (make <url> :from "http://www.gnu.org/")
 ;; => #<PURI:URI http://www.gnu.org/>
@@ -144,10 +129,10 @@
 ;; (render-uri (make <urn> :identity "test"))
 ;; => "urn:uuid:da5b8893-d6ca-5c1c-9a9c-91f40a2a3649"
 ;;
-;; (== <urn> (make <urn> :identity "test") (make <urn> :identity "test"))
+;; (== <uri> (make <urn> :identity "test") (make <urn> :identity "test"))
 ;; => T
 ;;
-;; (== <urn> (make <urn> :identity "test") (make <urn> :identity "test0"))
+;; (== <uri> (make <urn> :identity "test") (make <urn> :identity "test0"))
 ;; => NIL
 ;;
 ;; (compare <uri> (make <urn> :identity "test") (make <urn> :identity "test"))
@@ -160,10 +145,10 @@
 ;; => -1
 ;;
 ;; (compare <uri> (make <url> :from "http://x.com/") (make <urn> :type 0))
-;; => 1
+;; => -1
 ;;
 ;; (compare <uri>  (make <urn> :type 0) (make <url> :from "http://x.com/"))
-;; => -1
+;; => 1
 ;;
 ;; (== <uri> (make <url> :from "http://x.com/") (make <urn> :identity "http://x.com/"))
 ;; => T
@@ -180,36 +165,4 @@
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Take 2: Attempt to use better interface composition
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(define-interface <uri-namestring> (<case-insensitive-string>)
-  ()
-  (:method> order< (x y)
-    (string-lessp (render-uri x) (render-uri y)))
-  (:method> order<= (x y)
-    (string-not-greaterp (render-uri x) (render-uri y)))
-  (:method> order> (x y)
-    (string-greaterp (render-uri x) (render-uri y)))
-  (:method> order>= (x y)
-    (string-not-lessp (render-uri x) (render-uri y)))
-  (:method> == (x y)
-    (string-equal (render-uri x) (render-uri y)))
-  (:method> == ((x puri:uri) (y puri:uri))
-    (puri:uri= x y))
-  (:method> == ((x unicly:unique-universal-identifier) (y unicly:unique-universal-identifier))
-    (unicly:uuid-eql x y))
-  (:method> == ((x puri:uri) (y unicly:unique-universal-identifier))
-    (== y x))
-  (:method> == ((x unicly:unique-universal-identifier) (y puri:uri))
-    (== x (unicly:make-v5-uuid unicly:*uuid-namespace-url* (render-uri y))))
-  (:method> == ((x puri:urn) (y unicly:unique-universal-identifier))
-    (== (render-uri x) (render-uri y)))
-  (:method> == ((x unicly:unique-universal-identifier) (y puri:urn))
-    (== y x))
-  (:method> eq-function ()  ;; this sucks
-    #'uri-eq)               ;; <---------
-  (:abstract))
 
