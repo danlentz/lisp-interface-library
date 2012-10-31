@@ -3,6 +3,22 @@
 
 (in-package :interface)
 
+;;;
+;;; this is just here to facilitate a learning and prototyping environment of course in
+;;; practice there'd be reader conditionalization or some other mechanism
+;;;
+
+(let ((pkgs '(:unicly :puri)))
+  (unless (notany #'null (mapcar #'find-package pkgs))
+    (ql:quickload pkgs)))
+
+;;;
+;;; supporting utilities.  Again in production there'd be a bit more care given to the
+;;; nuances of uri/urn semantics. I have a decent collection of code implementing such 
+;;; things scattered among a couple of other projects that i've used with de.setf.resource
+;;; and wilbur.
+;;;
+
 (defgeneric render-uri (uri)
   (:method ((uri string))   uri)
   (:method ((uri puri:uri)) (puri:render-uri uri nil))
@@ -18,13 +34,21 @@
       ((string-lessp x y) -1)
       (t                   1)))
   (:method (x (y puri:uri))
-    (compare-uri (render-uri x) (render-uri y)))
+    (- (compare-uri y x)))
   (:method ((x puri:uri) y)
     (compare-uri (render-uri x) (render-uri y)))
   (:method (x (y unicly:unique-universal-identifier))
-    (compare-uri (render-uri x) (render-uri y)))
+    (- (compare-uri y x)))
   (:method ((x unicly:unique-universal-identifier) y)
     (compare-uri (render-uri x) (render-uri y)))
+  (:method ((x unicly:unique-universal-identifier) (y puri:urn))
+    (- (compare-uri y x)))
+  (:method ((x puri:urn) (y unicly:unique-universal-identifier))
+    (compare-uri (render-uri x) (render-uri y)))
+  (:method ((x unicly:unique-universal-identifier) (y puri:uri))
+    (compare-uri x (unicly:make-v5-uuid unicly:*uuid-namespace-url* (render-uri y))))
+  (:method ((x puri:uri) (y unicly:unique-universal-identifier))
+    (- (compare-uri y x)))
   (:method ((x unicly:unique-universal-identifier) (y unicly:unique-universal-identifier))
     (or (when (unicly:uuid-eql x y) 0)
       (compare-uri (render-uri x) (render-uri y))))
@@ -32,6 +56,9 @@
     (or (when (puri:uri= x y) 0)
       (compare-uri (render-uri x) (render-uri y)))))
 
+;;;
+;;; At last, the Interfaces
+;;;
 
 (define-interface <uri> (<compare>)
   ((compare-function :initarg :compare :reader compare-function))
@@ -59,14 +86,14 @@
 
 (defmethod make ((<i> <urn>) &key identity (ns unicly:*UUID-NAMESPACE-URL*) (type 5))
   (ecase type
-    (5 (if identity (unicly:make-v5-uuid ns identity) ns))
+    (5 (if identity (unicly:make-v5-uuid ns (render-uri (puri:uri identity))) ns))
     (4 (unicly:make-v4-uuid))
     (0 (unicly:make-null-uuid))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; tests
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; testing it out...
+;;;
 
 
 ;; (make <url> :from "http://www.gnu.org/")
@@ -120,9 +147,22 @@
 ;; (compare <uri>  (make <urn> :type 0) (make <urn> :identity "test"))
 ;; => -1
 ;;
-;; (compare <uri> (make <url> :from "http://x.com") (make <urn> :type 0))
+;; (compare <uri> (make <url> :from "http://x.com/") (make <urn> :type 0))
+;; => 1
+;;
+;; (compare <uri>  (make <urn> :type 0) (make <url> :from "http://x.com/"))
 ;; => -1
 ;;
-;; (compare <uri>  (make <urn> :type 0) (make <url> :from "http://x.com"))
-;; => 1
+;; (== <uri> (make <url> :from "http://x.com/") (make <urn> :identity "http://x.com/"))
+;; => T
+;;
+;; (== <uri> (make <url> :from "http://x.com/") (make <urn> :identity "http://x.com"))
+;; => T
+;;
+;; (== <uri> (make <url> :from "http://x.com") (make <urn> :identity "http://x.com/"))
+;; => T
+;;
+;; (== <uri> (make <url> :from "http://y.com/") (make <urn> :identity "http://x.com/"))
+;; => NIL
+;;
 
