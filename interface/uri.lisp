@@ -20,6 +20,7 @@
 ;;;
 
 (defgeneric render-uri (uri)
+  (:method ((uri t))        (princ-to-string uri))
   (:method ((uri string))   uri)
   (:method ((uri puri:uri)) (puri:render-uri uri nil))
   (:method ((uri unicly:unique-universal-identifier)) (unicly:uuid-as-urn-string nil uri)))
@@ -27,7 +28,10 @@
 
 (defgeneric compare-uri (x y)
   (:method ((x t) (y t))
-    (eq x y))
+    (cond
+      ((eq           x y)  0)
+      ((string-lessp (render-uri x) (render-uri y)) -1)
+      (t                   1)))
   (:method ((x string) (y string))
     (cond
       ((equalp       x y)  0)
@@ -56,11 +60,16 @@
     (or (when (puri:uri= x y) 0)
       (compare-uri (render-uri x) (render-uri y)))))
 
-;;;
-;;; At last, the Interfaces
-;;;
+(defun uri-eq (x y)
+  (= 0 (compare-uri x y)))
 
-(define-interface <uri> (<compare>)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Take 1: Simplistic (but working) First Attempt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-interface <uri> (<compare> )
   ((compare-function :initarg :compare :reader compare-function))
   (:parametric (&optional (compare #'compare-uri)) (make-interface :compare compare))
   (:method> uri-p (thing)
@@ -79,7 +88,7 @@
     (puri:uri from)))
 
 
-(define-interface <urn> (<uri>) ()
+(define-interface <urn> (<uri> <makeable>) ()
   (:parametric (&optional (compare #'compare-uri)) (make-interface :compare compare))
   (:singleton))
 
@@ -92,9 +101,9 @@
 
 
 ;;;
-;;; testing it out...
+;;; testing it out...  The following does indeed show the intended operation and output 
+;;; that I'm looking to achieve from the <URI> Interface
 ;;;
-
 
 ;; (make <url> :from "http://www.gnu.org/")
 ;; => #<PURI:URI http://www.gnu.org/>
@@ -168,4 +177,39 @@
 ;; (== <uri> (make <url> :from "http://y.com/") (make <urn> :identity "http://x.com/"))
 ;; => NIL
 ;;
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Take 2: Attempt to use better interface composition
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-interface <uri-namestring> (<case-insensitive-string>)
+  ()
+  (:method> order< (x y)
+    (string-lessp (render-uri x) (render-uri y)))
+  (:method> order<= (x y)
+    (string-not-greaterp (render-uri x) (render-uri y)))
+  (:method> order> (x y)
+    (string-greaterp (render-uri x) (render-uri y)))
+  (:method> order>= (x y)
+    (string-not-lessp (render-uri x) (render-uri y)))
+  (:method> == (x y)
+    (string-equal (render-uri x) (render-uri y)))
+  (:method> == ((x puri:uri) (y puri:uri))
+    (puri:uri= x y))
+  (:method> == ((x unicly:unique-universal-identifier) (y unicly:unique-universal-identifier))
+    (unicly:uuid-eql x y))
+  (:method> == ((x puri:uri) (y unicly:unique-universal-identifier))
+    (== y x))
+  (:method> == ((x unicly:unique-universal-identifier) (y puri:uri))
+    (== x (unicly:make-v5-uuid unicly:*uuid-namespace-url* (render-uri y))))
+  (:method> == ((x puri:urn) (y unicly:unique-universal-identifier))
+    (== (render-uri x) (render-uri y)))
+  (:method> == ((x unicly:unique-universal-identifier) (y puri:urn))
+    (== y x))
+  (:method> eq-function ()  ;; this sucks
+    #'uri-eq)               ;; <---------
+  (:abstract))
 
