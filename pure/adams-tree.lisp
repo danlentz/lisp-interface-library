@@ -9,12 +9,14 @@
 (defmethod key-interface ((<i> <rb-tree>))
   (order-interface <i>))
 
+
+
 (defun node/remove-leftmost (<i> node)
   "Return a tree the same as the one rooted at NODE,
    with the node containing the minimum key removed. See {defun
    tree::node/least}"
   (cond
-    ((empty-p <i> node)           (error "remove-least: empty tree"))
+    ((empty-p <i> node)           (error "remove-leftmost: empty tree"))
     ((empty-p <i> (node/l node))  (node/r node))
     (t
       (node/join <i> (node/k node) (node/v node)
@@ -58,7 +60,6 @@
           (node/concat3 <i> k v node1  (node/remove-leftmost <i> node2)))))))
 
 
-
 (defun node/for-all (<i> node predicate fn)
   "For the side-effect, apply FN to each node of the tree rooted at
   NODE for which the predicate function returns a non-nil value"
@@ -70,6 +71,164 @@
       (node/for-all <i> r predicate fn))))
 
 
+(defun node/filter  (<i> node predicate)
+  (let ((result (kvlr (k v l r) node
+                  (node/create <i> k v l r))))
+    (node/for-all <i> node
+      (lambda (k)
+        (not (funcall predicate k)))
+      (lambda (k v)
+        (declare (ignore v))
+        (setf result (drop <i> result k))))
+    (return-from node/filter result)))
+
+
+;; Using <binary-tree> drop
+#+()
+(defun node/remove (<i> node k)
+  (if (empty-p <i> node)
+    (leaf)
+    (kvlr (key val l r) node
+      (cond
+        ((order< <i> k key) (node/join <i> key val (node/remove <i> l k) r))
+        ((order< <i> key k) (node/join <i> key val l (node/remove <i> k r)))
+          (t
+            (node/concat2 <i> l r))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Operations to Support <SET>
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    
+(defun node/split-lesser (<i> node k)
+  (cond
+    ((empty-p <i> node)                  (empty <i>))
+    ((order< <i> k (node/k node)) (node/split-lesser <i> (node/l node) k))    
+    ((order> <i> k (node/k node)) (node/concat3 <i>
+                                        (node/k node)
+                                        (node/v node)
+                                        (node/l node)
+                                        (node/split-lesser <i> (node/r node) k)))
+    (t (node/l node))))
+
+  
+(defun node/split-greater (<i> node k)
+  (cond
+    ((empty-p <i> node)          (empty <i>))
+    ((order< <i> (node/k node) k) (node/split-greater <i> (node/r node) k))    
+    ((order> <i> (node/k node) k) (node/concat3 <i>
+                                        (node/k node)
+                                        (node/v node)
+                                        (node/split-greater <i> (node/l node) k)
+                                        (node/r node)))
+    (t (node/r node))))
+
+  
+(defun node/split (<i> node k)
+  "returns a triple (l present r) where: l is the set of elements of
+  s that are < k, r is the set of elements of s that are > k, present
+  is false if s contains no element equal to k, or
+  (k . v) if s contains an element with key equal to k"
+  (cond
+    ((empty-p <i> node) (list nil nil nil))
+    (t             (kvlr (ak v l r) node
+                     (let ((c (compare <i> k ak)))
+                       (cond
+                         ((zerop  c) (return-from node/split 
+                                       (list l (cons k v) r)))
+                         ((minusp c) (destructuring-bind (ll pres rl) (node/split <i> l k)
+                                       (list ll pres (node/concat3 <i> ak v rl r))))
+                         ((plusp  c) (destructuring-bind (lr pres rr) (node/split <i> r k)
+                                       (list (node/concat3 <i> ak v l lr) pres rr)))))))))
+
+
+(defun node/union (<i> node1 node2)
+  "returns a new tree containing a single association pairs for each key
+   present in either node1 or node2"
+  (cond
+    ((empty-p <i> node1) node2)
+    ((empty-p <i> node2) node1)
+    (t
+      (kvlr (ak av l r) node2
+        (let ((l1 (node/split-lesser <i> node1 ak))
+               (r1 (node/split-greater <i> node1 ak)))
+          (node/concat3 <i> ak av
+            (node/union <i> l1 l)
+            (node/union <i> r1 r)))))))
+
+
+
+(defun node/intersection (<i> node1 node2)
+  (cond
+    ((empty-p <i> node1) (empty <i>))
+    ((empty-p <i> node2) (empty <i>))
+    (t
+      (kvlr (ak av l r) node2
+        (let ((l1 (node/split-lesser <i> node1 ak))
+               (r1 (node/split-greater <i> node1 ak)))
+          (if (node/find <i> ak node1)
+            (node/concat3 <i> ak av
+              (node/intersection <i> l1 l)
+              (node/intersection <i> r1 r))
+            (node/concat <i>
+              (node/intersection <i> l1 l)
+              (node/intersection <i> r1 r))))))))
+
+
+  
+(defun node/difference (<i> node1 node2)
+  (cond
+    ((empty-p <i> node1) (empty <i>))
+    ((empty-p <i> node2) node1)
+    (t
+      (kvlr (ak av l r) node2
+        (declare (ignore av))
+        (let ((l1 (node/split-lesser <i> node1 ak))
+               (r1 (node/split-greater <i> node1 ak)))
+          (node/concat <i>
+            (node/difference <i> l1 l)
+            (node/difference <i> r1 r)))))))
+
+
+
+
+
+(deftype merge-direction ()
+  "specifies precidence based on lexical order of argument list"
+  `(member :left :right))
+
+;;; FIXME: not working?
+#+()
+(defun node/union-merge (<i> node1 node2 &optional (merge :left))
+  (check-type merge merge-direction)
+  (let ((do-merge-values
+          (case merge
+            (:left  #'first)
+            (:right #'second)
+            (t      (error "invalid merge type ~S, must be :left or :right" merge)))))
+    (cond
+      ((empty-p <i> node1) node2)
+      ((empty-p <i> node2) node1)
+      (t
+        (kvlr (ak av l r) node2
+          (let* ((node1 (node/find <i> ak node1))
+                  (l1  (node/split-lesser  <i> node1 ak))
+                  (r1  (node/split-greater <i> node1 ak))
+                  (val (if node1
+                         (funcall do-merge-values (list (node/v node1) av))
+                         av)))
+            (node/concat3 <i> ak val
+              (node/union-merge <i> l1 l merge)
+              (node/union-merge <i> r1 r merge))))))))
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Code Ends Here
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 #|

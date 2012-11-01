@@ -40,6 +40,25 @@
         (node/cons-enum l (list (cons k v) r enum))))))
 
 
+(defun node/find (<i> k node)
+  "find k (if exists) in only d comparisons (d is depth of tree)
+   rather than the traditional compare/low compare/high which takes on
+   avg (* 1.5 (- d 1))"
+  (labels ((recur (this best)
+             (cond
+               ((empty-p <i> this)               (return-from recur best))
+               ((order<  <i> k (node/k this))    (recur (node/l this) best))
+               (t                                (recur (node/r this) this)))))
+    (let ((best (recur node nil)))
+      (when best
+        (unless (order< <i> (node/k best) k)
+          (return-from node/find best))))))
+
+
+(defmethod lookup ((<i> <adams-tree>) node key)
+  (node/find <i> key node))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Red-Black Tree Invariants
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
