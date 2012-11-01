@@ -1,5 +1,6 @@
 ;;; -*- Mode: Lisp ; Base: 10 ; Syntax: ANSI-Common-Lisp -*-
-;;;;; Universal Resource Identifier
+
+;;;;; Universal Resource Identifier, implementing both URL and URN Interfaces
 
 (in-package :interface)
 
