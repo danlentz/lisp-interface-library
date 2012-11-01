@@ -98,28 +98,3 @@
   ((key-interface :allocation :class :initform <number> :reader key-interface))
   (:abstract)) ;; must be pure or stateful!
 
-;;; RB-tree
-
-(define-interface <rb-tree> (<heighted-binary-tree>) ()
-  (:abstract))
-
-(defclass rb-tree-node (heighted-binary-tree-node) ())
-
-;;; Trees that maintain a record of their weight
-(define-interface <weighted-binary-tree> (<binary-tree>) ()
-  (:abstract))
-
-(defclass weighted-binary-tree-node (binary-tree-node)
-  ((size
-    :initarg :size
-    :initform 0
-    :type integer
-    :reader node-size)))
-
-;;; WB-tree
-
-(define-interface <wb-tree> (<weighted-binary-tree>) ()
-  (:abstract))
-
-(defclass wb-tree-node (weighted-binary-tree-node) ())
-
