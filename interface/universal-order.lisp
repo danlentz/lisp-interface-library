@@ -2,6 +2,13 @@
 
 ;;;;; Universal Ordering Relation
 
+;;; Definately open to suggestions if there are any types for which a different ordering
+;;; relation is preferred.  I looked at fset's ordering, but I don't think it's very
+;;; sensible, as the order of any two objects cannot be relied upon and may change
+;;; based on the relative order in which their compare functions are defined.  This
+;;; tries to be more stable and revert to lexical based comparison when all else fails;
+;;; I believe this will be consistent within the context of an individual lisp session.
+
 (in-package :interface)
 
 ;;;
