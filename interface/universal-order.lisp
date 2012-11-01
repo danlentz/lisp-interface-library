@@ -211,10 +211,13 @@
   (assert (not (== <universal-order> lesser greater)))
   (assert (not (== <universal-order> greater lesser))))
 
+
 (defclass foo ()
   ((a :initarg :a)
     (b :initarg :b)))
-  
+
+(defclass bar () ())
+
 (defun check-universal-ordinality-for-various-types ()
   (progn 
     (check-universal-ordinality #\a  #\z)
@@ -233,6 +236,7 @@
     (check-universal-ordinality 'aardvark 'zebra)
     (check-universal-ordinality (make-instance 'standard-object) (make-instance 'standard-object))
     (check-universal-ordinality (make-instance 'foo :a 0 :b 0)   (make-instance 'foo :a 1 :b 1))
+    (check-universal-ordinality (make-instance 'bar) (make-instance 'foo :a 0 :b 0))
     (check-universal-ordinality (local-time:now) (progn (sleep .001) (local-time:now)))
     (check-universal-ordinality (find-package :common-lisp) (find-package :keyword))
     (check-universal-ordinality #p"/tmp/aardvark" #p"/tmp/zebra")))
