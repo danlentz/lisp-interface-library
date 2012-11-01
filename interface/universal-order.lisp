@@ -13,6 +13,13 @@
   (unless (notany #'null (mapcar #'find-package pkgs))
     (ql:quickload pkgs)))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Prepare Reader Conditionals
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (eval-when (:load-toplevel :compile-toplevel :execute)
   (when (find-package :local-time)
     (pushnew :local-time *features*)))
@@ -182,7 +189,6 @@
   (:singleton))
 
 
-
 (defun check-universal-ordinality (lesser greater)
   (assert (eql (compare <universal-order> lesser  greater) -1))
   (assert (eql (compare <universal-order> greater lesser)   1))
@@ -225,12 +231,8 @@
     (check-universal-ordinality :aardvark :zebra)
     (check-universal-ordinality '#:aardvark '#:zebra)
     (check-universal-ordinality 'aardvark 'zebra)
-    (check-universal-ordinality
-      (make-instance 'standard-object)
-      (make-instance 'standard-object))
-    (check-universal-ordinality
-      (make-instance 'foo :a 0 :b 0)
-      (make-instance 'foo :a 1 :b 1))    
+    (check-universal-ordinality (make-instance 'standard-object) (make-instance 'standard-object))
+    (check-universal-ordinality (make-instance 'foo :a 0 :b 0)   (make-instance 'foo :a 1 :b 1))
+    (check-universal-ordinality (local-time:now) (progn (sleep .001) (local-time:now)))
     (check-universal-ordinality (find-package :common-lisp) (find-package :keyword))
-    (check-universal-ordinality #p"/tmp/aardvark" #p"/tmp/zebra"))
-  )
+    (check-universal-ordinality #p"/tmp/aardvark" #p"/tmp/zebra")))
